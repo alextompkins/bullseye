@@ -25,18 +25,25 @@ class App:
 	def segment_regions(image):
 		image = image.copy()
 		image = cv2.GaussianBlur(image, (5, 5), 0)
-
 		image = cv2.cvtColor(image, cv2.COLOR_BGR2HSV)
-		blue = cv2.inRange(image, (175, 100, 0), (200, 255, 255))
-		blue = cv2.morphologyEx(blue, cv2.MORPH_CLOSE, (10, 10), iterations=5)
-		cv2.imshow('blue', blue)
-
-		# red = cv2.inRange(image, (, 100, 0), (360, 255, 255))
-		# red = cv2.morphologyEx(red, cv2.MORPH_CLOSE, (10, 10), iterations=5)
-		# cv2.imshow('red', red)
 
 		yellow = cv2.inRange(image, (20, 100, 0), (40, 255, 255))
 		yellow = cv2.morphologyEx(yellow, cv2.MORPH_CLOSE, (10, 10), iterations=5)
 		cv2.imshow('yellow', yellow)
+
+		red = cv2.inRange(image, (175, 100, 0), (200, 255, 255))
+		red = cv2.morphologyEx(red, cv2.MORPH_CLOSE, (10, 10), iterations=5)
+		cv2.imshow('red', red)
+
+		blue = cv2.inRange(image, (30, 150, 0), (100, 250, 255))
+		blue = cv2.morphologyEx(blue, cv2.MORPH_CLOSE, (10, 10), iterations=5)
+		cv2.imshow('blue', blue)
+
+		black = cv2.inRange(image, (0, 0, 0), (255, 35, 150))
+		black = cv2.morphologyEx(black, cv2.MORPH_CLOSE, (10, 10), iterations=5)
+		cv2.imshow('black', black)
+
+		combined = cv2.add(cv2.add(cv2.add(yellow, red), blue), black)
+		cv2.imshow('combined', combined)
 
 		return image
