@@ -15,7 +15,7 @@ setup(
     description='Automatic archery target scoring.',
     author='Alex Tompkins',
     author_email='alex.tompkins@atomic.nz',
-    url='https://github.com/alextompkins/piano-vision',
+    url='https://github.com/alextompkins/bullseye',
     packages=find_packages(),
     include_package_data=True,
     install_requires=requirements,
