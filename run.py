@@ -1,7 +1,7 @@
 from bullseye import App
 
 
-IMAGE_NAME = 'target.jpg'
+IMAGE_NAME = 'target1.jpg'
 
 
 if __name__ == '__main__':
