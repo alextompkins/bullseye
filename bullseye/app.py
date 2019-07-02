@@ -4,6 +4,8 @@ from math import atan2, degrees
 import cv2
 import numpy as np
 
+from bullseye.helpers import average_point, centre_of_contour, dist, mean_and_standard_dev
+
 
 class Colour(Enum):
 	"""Definitions of colours in BGR colour space"""
@@ -32,6 +34,9 @@ class Ellipse:
 	def to_tuple(self):
 		return (self.x, self.y), (self.width, self.height), self.angle
 
+	def get_centre(self):
+		return self.x, self.y
+
 
 class App:
 	def __init__(self, sample_img_name):
@@ -42,9 +47,37 @@ class App:
 		while not exited:
 			resized = self.resize_image(self.image)
 			gold, red, blue, black = self.segment_regions(resized)
-			for name, colour in ('gold', gold), ('red', red), ('blue', blue), ('black', black):
-				annotated = self.find_biggest_circle(resized, colour)
-				cv2.imshow('{}_circle'.format(name), annotated)
+
+			annotated = resized.copy()
+			contours = dict()
+			for name, region in ('gold', gold), ('red', red), ('blue', blue), ('black', black):
+				largest_contour = self.find_biggest_contour(region)
+				contours[name] = largest_contour
+
+			for contour in contours.values():
+				cv2.drawContours(annotated, contour, -1, Colour.MAGENTA.value, thickness=2)
+				cv2.circle(annotated, centre_of_contour(contour), 2, Colour.RED.value, thickness=10)
+
+			centres = tuple(map(lambda c: centre_of_contour(c), contours.values()))
+			true_centre = average_point(centres)
+			cv2.circle(annotated, tuple(true_centre[0]), 2, Colour.BLUE.value, thickness=5)
+
+			for contour in contours.values():
+				mean_dist, std_dev = mean_and_standard_dev(contour, key=lambda pt: dist(true_centre, pt))
+				filtered = tuple(filter(lambda pt: abs(dist(true_centre, pt) - mean_dist) < std_dev, contour))
+				cv2.drawContours(annotated, filtered, -1, Colour.YELLOW.value, thickness=1)
+				filtered = np.asarray(filtered)
+
+				# Draw a circle for each region
+				mean_dist, std_dev = mean_and_standard_dev(filtered, key=lambda pt: dist(true_centre, pt))
+				cv2.circle(annotated, centre_of_contour(filtered), int(mean_dist), Colour.CYAN.value, thickness=2)
+
+				# Draw an ellipse for each region
+				ellipse = Ellipse(*cv2.fitEllipse(filtered))
+				cv2.ellipse(annotated, ellipse.to_tuple(), Colour.GREEN.value, thickness=2)
+
+			cv2.imshow('ellipse', annotated)
+
 			# edges = self.find_edges(segmented_regions)
 			# annotated_image = self.find_circles(resized, segmented_regions)
 
@@ -85,16 +118,10 @@ class App:
 		return gold, red, blue, black
 
 	@staticmethod
-	def find_biggest_circle(orig, binary):
-		annotated = orig.copy()
+	def find_biggest_contour(binary):
 		contours, hierarchy = cv2.findContours(binary, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE)
 		largest_contour = max(contours, key=cv2.contourArea)
-		pruned = prune_circle_contour(largest_contour)
-		cv2.drawContours(annotated, largest_contour, -1, Colour.MAGENTA.value, thickness=2)
-		ellipse = Ellipse(*cv2.fitEllipse(largest_contour))
-		cv2.ellipse(annotated, ellipse.to_tuple(), Colour.CYAN.value, thickness=3)
-		cv2.circle(annotated, (int(ellipse.x), int(ellipse.y)), 2, Colour.RED.value, thickness=10)
-		return annotated
+		return largest_contour
 
 	@staticmethod
 	def find_edges(image):
