@@ -1,4 +1,5 @@
 from enum import Enum
+from math import atan2, degrees
 
 import cv2
 import numpy as np
@@ -88,11 +89,11 @@ class App:
 		annotated = orig.copy()
 		contours, hierarchy = cv2.findContours(binary, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE)
 		largest_contour = max(contours, key=cv2.contourArea)
+		pruned = prune_circle_contour(largest_contour)
 		cv2.drawContours(annotated, largest_contour, -1, Colour.MAGENTA.value, thickness=2)
 		ellipse = Ellipse(*cv2.fitEllipse(largest_contour))
 		cv2.ellipse(annotated, ellipse.to_tuple(), Colour.CYAN.value, thickness=3)
-		# draw the center of the circle
-		cv2.circle(annotated, (int(ellipse.x), int(ellipse.y)), 2, Colour.RED.value, 10)
+		cv2.circle(annotated, (int(ellipse.x), int(ellipse.y)), 2, Colour.RED.value, thickness=10)
 		return annotated
 
 	@staticmethod
@@ -119,3 +120,17 @@ class App:
 
 		cv2.imshow('hough_circles', annotated_image)
 		return annotated_image
+
+
+def prune_circle_contour(contour):
+	pruned = []
+	prev_angle = None
+	for i in range(len(contour) - 1):
+		pt, next_pt = contour[i][0], contour[i + 1][0]
+		dx = next_pt[0] - pt[0]
+		dy = next_pt[1] - pt[1]
+		angle = degrees(atan2(dy, dx))
+		# if abs(angle) > 3:
+		print(pt, next_pt, angle)
+
+	return pruned
