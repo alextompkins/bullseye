@@ -4,7 +4,7 @@ from math import atan2, degrees
 import cv2
 import numpy as np
 
-from bullseye.helpers import average_point, centre_of_contour, dist, mean_and_standard_dev
+from bullseye.helpers import average_point, centre_of_contour, dist, mean_and_standard_dev, group, avg_of_groups
 
 
 class Colour(Enum):
@@ -15,6 +15,10 @@ class Colour(Enum):
 	YELLOW = (0, 255, 255)
 	MAGENTA = (255, 0, 255)
 	CYAN = (255, 255, 0)
+	TARGET_GOLD = (0, 212, 251)
+	TARGET_RED = (25, 25, 217)
+	TARGET_BLUE = (206, 158, 0)
+	TARGET_BLACK = (20, 19, 19)
 
 
 class ScoreColourThreshold(Enum):
@@ -50,36 +54,49 @@ class App:
 
 			annotated = resized.copy()
 			contours = dict()
-			for name, region in ('gold', gold), ('red', red), ('blue', blue), ('black', black):
+			for name, region in ('GOLD', gold), ('RED', red), ('BLUE', blue), ('BLACK', black):
 				largest_contour = self.find_biggest_contour(region)
 				contours[name] = largest_contour
 
 			for contour in contours.values():
-				cv2.drawContours(annotated, contour, -1, Colour.MAGENTA.value, thickness=2)
-				cv2.circle(annotated, centre_of_contour(contour), 2, Colour.RED.value, thickness=10)
+				pass
+				# cv2.drawContours(annotated, contour, -1, Colour.MAGENTA.value, thickness=2)
+				# cv2.circle(annotated, centre_of_contour(contour), 2, Colour.RED.value, thickness=10)
 
 			centres = tuple(map(lambda c: centre_of_contour(c), contours.values()))
 			true_centre = average_point(centres)
 			cv2.circle(annotated, tuple(true_centre[0]), 2, Colour.BLUE.value, thickness=5)
 
-			for contour in contours.values():
+			for colour, contour in contours.items():
 				mean_dist, std_dev = mean_and_standard_dev(contour, key=lambda pt: dist(true_centre, pt))
 				filtered = tuple(filter(lambda pt: abs(dist(true_centre, pt) - mean_dist) < std_dev, contour))
-				cv2.drawContours(annotated, filtered, -1, Colour.YELLOW.value, thickness=1)
+				# cv2.drawContours(annotated, filtered, -1, Colour.YELLOW.value, thickness=1)
 				filtered = np.asarray(filtered)
 
 				# Draw a circle for each region
 				mean_dist, std_dev = mean_and_standard_dev(filtered, key=lambda pt: dist(true_centre, pt))
-				cv2.circle(annotated, centre_of_contour(filtered), int(mean_dist), Colour.CYAN.value, thickness=2)
+				cv2.circle(annotated, centre_of_contour(filtered), int(mean_dist), Colour['TARGET_{}'.format(colour)].value, thickness=2)
 
 				# Draw an ellipse for each region
 				ellipse = Ellipse(*cv2.fitEllipse(filtered))
-				cv2.ellipse(annotated, ellipse.to_tuple(), Colour.GREEN.value, thickness=2)
+				# cv2.ellipse(annotated, ellipse.to_tuple(), Colour.GREEN.value, thickness=2)
 
-			cv2.imshow('ellipse', annotated)
+			edges = self.find_edges(resized)
 
-			# edges = self.find_edges(segmented_regions)
-			# annotated_image = self.find_circles(resized, segmented_regions)
+			arrow_impacts = []
+			lines = cv2.HoughLinesP(edges, 1, np.pi / 180, threshold=50, minLineLength=50, maxLineGap=5)
+			if lines is not None:
+				for line in lines:
+					for x1, y1, x2, y2 in line:
+						cv2.line(annotated, (x1, y1), (x2, y2), Colour.GREEN.value, thickness=2)
+						closest_to_centre = min((x1, y1), (x2, y2), key=lambda pt: dist(true_centre, [pt]))
+						arrow_impacts.append(closest_to_centre)
+
+			for impact in arrow_impacts:
+				# print(impact)
+				cv2.circle(annotated, impact, radius=2, color=Colour.CYAN.value, thickness=2)
+
+			cv2.imshow('annotated', annotated)
 
 			pressed_key = cv2.waitKey(100) & 0xFF
 			if pressed_key == ord('q'):
@@ -126,9 +143,9 @@ class App:
 	@staticmethod
 	def find_edges(image):
 		image = image.copy()
+		image = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
 		image = cv2.GaussianBlur(image, (5, 5), 0)
-		# image = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
-		edges = cv2.Canny(image, 100, 200)
+		edges = cv2.Canny(image, 100, 300)
 
 		cv2.imshow('edges', edges)
 		return edges
