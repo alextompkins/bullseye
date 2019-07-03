@@ -98,7 +98,6 @@ class App:
 							# cv2.line(annotated, (x1, y1), (x2, y2), Colour.BLUE.value, thickness=2)
 
 			merged_lines = HoughBundler().process_lines(filtered_lines)
-			print(len(filtered_lines), len(merged_lines))
 			for line in merged_lines:
 				(x1, y1), (x2, y2) = line
 				closest_to_centre = min((x1, y1), (x2, y2), key=lambda pt: dist(true_centre, [pt]))
