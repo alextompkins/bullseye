@@ -5,6 +5,7 @@ import cv2
 import numpy as np
 
 from bullseye.helpers import average_point, centre_of_contour, dist, mean_and_standard_dev, group, avg_of_groups
+from bullseye.hough_bundler import HoughBundler
 
 
 class Colour(Enum):
@@ -67,6 +68,7 @@ class App:
 			true_centre = average_point(centres)
 			cv2.circle(annotated, tuple(true_centre[0]), 2, Colour.BLUE.value, thickness=5)
 
+			score_regions = dict()  # score regions mapped to their radius
 			for colour, contour in contours.items():
 				mean_dist, std_dev = mean_and_standard_dev(contour, key=lambda pt: dist(true_centre, pt))
 				filtered = tuple(filter(lambda pt: abs(dist(true_centre, pt) - mean_dist) < std_dev, contour))
@@ -75,22 +77,33 @@ class App:
 
 				# Draw a circle for each region
 				mean_dist, std_dev = mean_and_standard_dev(filtered, key=lambda pt: dist(true_centre, pt))
+				score_regions[colour] = int(mean_dist)
 				cv2.circle(annotated, centre_of_contour(filtered), int(mean_dist), Colour['TARGET_{}'.format(colour)].value, thickness=2)
 
 				# Draw an ellipse for each region
-				ellipse = Ellipse(*cv2.fitEllipse(filtered))
+				# ellipse = Ellipse(*cv2.fitEllipse(filtered))
 				# cv2.ellipse(annotated, ellipse.to_tuple(), Colour.GREEN.value, thickness=2)
 
 			edges = self.find_edges(resized)
 
 			arrow_impacts = []
+			filtered_lines = []
 			lines = cv2.HoughLinesP(edges, 1, np.pi / 180, threshold=50, minLineLength=50, maxLineGap=5)
 			if lines is not None:
 				for line in lines:
 					for x1, y1, x2, y2 in line:
-						cv2.line(annotated, (x1, y1), (x2, y2), Colour.GREEN.value, thickness=2)
 						closest_to_centre = min((x1, y1), (x2, y2), key=lambda pt: dist(true_centre, [pt]))
-						arrow_impacts.append(closest_to_centre)
+						if dist(true_centre, [closest_to_centre]) < score_regions['BLACK']:
+							filtered_lines.append(line)
+							# cv2.line(annotated, (x1, y1), (x2, y2), Colour.BLUE.value, thickness=2)
+
+			merged_lines = HoughBundler().process_lines(filtered_lines)
+			print(len(filtered_lines), len(merged_lines))
+			for line in merged_lines:
+				(x1, y1), (x2, y2) = line
+				closest_to_centre = min((x1, y1), (x2, y2), key=lambda pt: dist(true_centre, [pt]))
+				cv2.line(annotated, (x1, y1), (x2, y2), Colour.GREEN.value, thickness=2)
+				arrow_impacts.append(closest_to_centre)
 
 			for impact in arrow_impacts:
 				# print(impact)
